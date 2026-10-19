@@ -40,6 +40,16 @@ public class Reserva {
         this.numeroHuespedes = numeroHuespedes;
     }
 
+        /** Recrea una reserva ya existente (por ejemplo, leída de la base de datos). */
+    public static Reserva reconstruir(Long id, Habitacion habitacion, Huesped huesped,
+                                      LocalDate checkIn, LocalDate checkOut,
+                                      int numeroHuespedes, EstadoReserva estado) {
+        Reserva reserva = new Reserva(habitacion, huesped, checkIn, checkOut, numeroHuespedes);
+        reserva.id = id;
+        reserva.estado = Objects.requireNonNull(estado, "El estado es obligatorio");
+        return reserva;
+    }
+    
     public long getNoches() {
         return ChronoUnit.DAYS.between(checkIn, checkOut);
     }

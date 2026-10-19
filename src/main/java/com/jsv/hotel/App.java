@@ -1,11 +1,22 @@
 package com.jsv.hotel;
 
 import com.jsv.hotel.exception.HotelException;
-import com.jsv.hotel.model.*;
-import com.jsv.hotel.pricing.*;
+import com.jsv.hotel.model.HabitacionDoble;
+import com.jsv.hotel.model.HabitacionSencilla;
+import com.jsv.hotel.model.Huesped;
+import com.jsv.hotel.model.Reserva;
+import com.jsv.hotel.model.Suite;
+import com.jsv.hotel.pricing.CalculadoraPrecio;
+import com.jsv.hotel.pricing.Cotizacion;
+import com.jsv.hotel.pricing.DescuentoEstanciaLarga;
+import com.jsv.hotel.pricing.DescuentoTemporadaBaja;
+import com.jsv.hotel.pricing.PoliticaCancelacion;
 import com.jsv.hotel.repository.HabitacionRepository;
-import com.jsv.hotel.repository.memoria.*;
-import com.jsv.hotel.service.Cancelacion;
+import com.jsv.hotel.repository.ReservaRepository;
+import com.jsv.hotel.repository.sqlite.BaseDeDatos;
+import com.jsv.hotel.repository.sqlite.HabitacionRepositorySqlite;
+import com.jsv.hotel.repository.sqlite.HuespedRepositorySqlite;
+import com.jsv.hotel.repository.sqlite.ReservaRepositorySqlite;
 import com.jsv.hotel.service.ReservaService;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -15,49 +26,45 @@ import java.util.List;
 public class App {
 
     public static void main(String[] args) {
-        HabitacionRepository habitaciones = new HabitacionRepositoryMemoria();
-        habitaciones.guardar(new HabitacionSencilla(101, BigDecimal.valueOf(100_000)));
-        habitaciones.guardar(new HabitacionDoble(201, BigDecimal.valueOf(150_000), true));
-        habitaciones.guardar(new Suite(301, BigDecimal.valueOf(300_000)));
+        BaseDeDatos bd = new BaseDeDatos("hotel.db");
+        HabitacionRepository habitaciones = new HabitacionRepositorySqlite(bd);
+        ReservaRepository reservas = new ReservaRepositorySqlite(bd);
 
         ReservaService servicio = new ReservaService(
                 habitaciones,
-                new HuespedRepositoryMemoria(),
-                new ReservaRepositoryMemoria(),
+                new HuespedRepositorySqlite(bd),
+                reservas,
                 new CalculadoraPrecio(List.of(new DescuentoEstanciaLarga(), new DescuentoTemporadaBaja())),
                 new PoliticaCancelacion(),
                 Clock.systemDefaultZone());
 
-        LocalDate entrada = LocalDate.now().plusDays(30);
-        LocalDate salida = entrada.plusDays(8);
-        Huesped ana = new Huesped("Ana Gómez", "1020304050", "ana@gmail.com", "3001234567");
-
-        System.out.println("=== Habitaciones disponibles para 3 huéspedes ===");
-        servicio.buscarDisponibles(entrada, salida, 3)
-                .forEach(h -> System.out.println(h + " - $" + h.calcularPrecioPorNoche().longValue() + " por noche"));
-
-        Reserva reserva = servicio.reservar(301, ana, entrada, salida, 3);
-        Cotizacion cotizacion = servicio.cotizar(reserva);
-
-        System.out.println("\n=== Reserva " + reserva.getId() + " ===");
-        System.out.println("Huésped:   " + reserva.getHuesped());
-        System.out.println("Habitación: " + reserva.getHabitacion());
-        System.out.println("Fechas:    " + entrada + " a " + salida + " (" + reserva.getNoches() + " noches)");
-        System.out.printf("Subtotal:  $%,d%n", cotizacion.subtotal().longValue());
-        System.out.printf("Descuento: %s (%s%%) -$%,d%n", cotizacion.descuento(),
-                cotizacion.porcentaje(), cotizacion.valorDescuento().longValue());
-        System.out.printf("Total:     $%,d%n", cotizacion.total().longValue());
-
-        System.out.println("\n=== Intento de reservar la misma suite en fechas cruzadas ===");
-        try {
-            servicio.reservar(301, ana, entrada.plusDays(2), salida.plusDays(2), 2);
-        } catch (HotelException e) {
-            System.out.println("Rechazada: " + e.getMessage());
+        if (habitaciones.listar().isEmpty()) {
+            habitaciones.guardar(new HabitacionSencilla(101, BigDecimal.valueOf(100_000)));
+            habitaciones.guardar(new HabitacionDoble(201, BigDecimal.valueOf(150_000), true));
+            habitaciones.guardar(new Suite(301, BigDecimal.valueOf(300_000)));
+            System.out.println("Base de datos nueva: se cargaron 3 habitaciones.");
         }
 
-        Cancelacion cancelacion = servicio.cancelar(reserva.getId());
-        System.out.println("\n=== Cancelación ===");
-        System.out.println("Estado:       " + cancelacion.reserva().getEstado());
-        System.out.printf("Penalización: $%,d%n", cancelacion.penalizacion().longValue());
+        System.out.println("Reservas guardadas al iniciar: " + reservas.listar().size());
+
+        LocalDate entrada = LocalDate.now().plusDays(30);
+        LocalDate salida = entrada.plusDays(3);
+        Huesped ana = new Huesped("Ana Gómez", "1020304050", "ana@gmail.com", "3001234567");
+
+        try {
+            Reserva reserva = servicio.reservar(301, ana, entrada, salida, 3);
+            Cotizacion cotizacion = servicio.cotizar(reserva);
+            System.out.printf("Reserva #%d creada: %s, del %s al %s, total $%,d%n",
+                    reserva.getId(), reserva.getHabitacion(), entrada, salida,
+                    cotizacion.total().longValue());
+        } catch (HotelException e) {
+            System.out.println("No se pudo reservar: " + e.getMessage());
+        }
+
+        System.out.println("\nReservas en la base de datos:");
+        for (Reserva r : reservas.listar()) {
+            System.out.printf("#%d  %s  %s -> %s  [%s]%n",
+                    r.getId(), r.getHabitacion(), r.getCheckIn(), r.getCheckOut(), r.getEstado());
+        }
     }
 }
