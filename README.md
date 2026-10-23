@@ -119,6 +119,6 @@ Son 47 pruebas automáticas que cubren el modelo, las reglas de negocio (disponi
 
 ## Autor
 
-**Juan Sebastián Vélez Correa**: estudiante de Ingeniería Informática
+**Juan Sebastián Vélez Correa**
 
 GitHub: [JSV-AFK](https://github.com/JSV-AFK)
