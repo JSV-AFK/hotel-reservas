@@ -106,7 +106,14 @@ public class ReservaService {
                 .orElseThrow(() -> new RecursoNoEncontradoException(
                         "No existe la reserva " + reservaId));
     }
+    public List<Habitacion> listarHabitaciones() {
+        return habitaciones.listar();
+    }
 
+    public List<Reserva> listarReservas() {
+        return reservas.listar();
+    }
+    
     private boolean estaDisponible(Habitacion habitacion, LocalDate entrada, LocalDate salida) {
         return reservas.listarPorHabitacion(habitacion.getNumero()).stream()
                 .filter(r -> r.getEstado().ocupaHabitacion())
